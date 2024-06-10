@@ -14,6 +14,7 @@ default            192.168.64.1       UGScg             en0
 224.0.0.251        1:0:5e:0:0:fb      UHmLWI            en0       
 255.255.255.255/32 link#5             UCS               en0      !
 
+
 Internet6:
 Destination                             Gateway                         Flags           Netif Expire
 default                                 fe80::%utun0                    UGcIg           utun0       
