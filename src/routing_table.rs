@@ -139,7 +139,7 @@ pub async fn execute_netstat() -> Result<String, Error> {
 mod tests {
     use super::Error;
     use crate::{Destination, Entity, RoutingTable};
-    use std::{process::ExitStatus, string::FromUtf8Error};
+    use std::process::ExitStatus;
 
     include!(concat!(env!("OUT_DIR"), "/sample_table.rs"));
 

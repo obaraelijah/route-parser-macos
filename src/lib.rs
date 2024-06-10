@@ -11,7 +11,7 @@ pub use route_entry::RouteEntry;
 pub use routing_flag::RoutingFlag;
 pub use routing_table::RoutingTable;
 
-use cidr::AnyIpCidr; //  either an IPv4 or an IPv6 network or "any".
+use cidr::AnyIpCidr;
 use mac_address::MacAddress;
 
 /// A generic network entity
@@ -43,9 +43,9 @@ impl std::fmt::Display for Entity {
 }
 
 /// A destination entity with an optional zone
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Destination {
-    pub entity: Entity,
+    pub entity: crate::Entity,
     pub zone: Option<String>,
 }
 
@@ -56,6 +56,7 @@ impl std::fmt::Display for Destination {
         if let Some(zone) = &zone {
             write!(f, "%{zone}")?;
         }
+
         Ok(())
     }
 }
