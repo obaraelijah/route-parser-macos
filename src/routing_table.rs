@@ -30,6 +30,7 @@ pub enum Error {
 impl RoutingTable {
     /// Find the routing table entry that most-precisely matches the provided
     /// address.
+    #[must_use]
     pub fn find_route_entry(&self, addr: IpAddr) -> Option<&RouteEntry> {
         // TODO: implement a proper lookup table and/or short-circuit on an
         // exact match
@@ -42,6 +43,7 @@ impl RoutingTable {
             })
     }
 
+    #[must_use]
     pub fn default_gateways_for_netif(&self, net_if: &str) -> Option<&Vec<IpAddr>> {
         self.if_router.get(net_if)
     }
