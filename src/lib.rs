@@ -1,5 +1,6 @@
 mod route_entry;
 mod routing_flag;
+mod routing_table;
 
 use std::fmt::Write;
 
@@ -39,18 +40,24 @@ impl std::fmt::Display for Entity {
 }
 
 
+/// A destination entity with an optional zone
 pub struct Destination {
     pub entity: Entity,
+    pub zone: Option<String>,
 }
 
 impl std::fmt::Display for Destination {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Destination { entity } = self;
+        let Destination { entity, zone } = self;
         write!(f, "{entity}")?;
+        if let Some(zone) = &zone {
+            write!(f, "%{zone}")?;
+        }
         Ok(())
     }
 }
 
+/// Internet Protocols associated with routing table entries
 pub enum Protocol {
     V4,
     V6,

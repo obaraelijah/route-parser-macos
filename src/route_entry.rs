@@ -16,3 +16,9 @@ impl RouteEntry {
         todo!()
     }
 }
+
+fn parse_flags(flag_s: &str) -> HashSet<RoutingFlag> {
+    flag_s.chars().map(RoutingFlag::from).collect()
+}
+
+
