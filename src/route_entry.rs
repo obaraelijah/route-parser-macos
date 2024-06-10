@@ -1,6 +1,9 @@
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, net::{IpAddr, Ipv4Addr, Ipv6Addr}, time::Duration};
 
-use crate::{Destination, Protocol, RoutingFlag};
+use cidr::AnyIpCidr;
+use mac_address::MacAddress;
+
+use crate::{Destination, Entity, Protocol, RoutingFlag};
 
 /// A single route obtained from the `netstat -rn` output
 #[derive(Debug, Clone)]
@@ -79,12 +82,23 @@ pub enum Error {
 }
 
 impl RouteEntry {
-    pub(crate) fn parse(proto: Protocol, line: &str) -> Result<Self, Error> {
-        let flags = HashSet::new();
-        let dest = None;
-        let gateway = None;
-        let net_if: Option<String> = None;
-        let expires = None;
+    /// Parse a textual route entry from the netstat output, specifying the
+    /// current protocols and active column headers.
+    pub(crate) fn parse(proto: Protocol, line: &str, headers: &[&str]) -> Result<Self, Error> {
+        let fields: Vec<String> = line.split_ascii_whitespace().map(str::to_string).collect();
+        let mut flags = HashSet::new();
+        let mut dest = None;
+        let mut gateway = None;
+        let mut net_if: Option<String> = None;
+        let mut expires = None;
+
+        for (header,  field) in headers.iter().zip(fields) {
+            match *header {
+                "Flags" => flags = parse_flags(&field),
+                "Expire" => expires = parse_expire(&field)?,
+                _ => (),
+            }
+        }
 
         let route = RouteEntry {
             proto,
@@ -98,8 +112,89 @@ impl RouteEntry {
     }
 }
 
+fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
+    Ok(match dest {
+        "default" => Entity::Default,
+
+        cidr if cidr.contains('/') => {
+            Entity::Cidr(cidr.parse().map_err(|err| Error::ParseDestination {
+                value: cidr.into(),
+                err,
+            })?)
+        }
+
+        // IPv4 host
+        addr if addr.contains('.') => {
+            if let Ok(ipv4addr) = parse_ipv4dest(addr) {
+                Entity::Cidr(AnyIpCidr::new_host(IpAddr::V4(ipv4addr)))
+            } else {
+                // Bridge broadcast addresses sometimes contain a dot-delimited MAC address
+                Entity::Mac(
+                    addr.replace('.', ":")
+                        .parse::<MacAddress>()
+                        .map_err(|err| Error::ParseMacAddr {
+                            dest: addr.into(),
+                            err,
+                        })?,
+                )
+            }
+        }
+
+        // IPv6 host
+        addr if addr.contains(':') => {
+            if let Ok(v6addr) = addr.parse::<Ipv6Addr>() {
+                Entity::Cidr(AnyIpCidr::new_host(IpAddr::V6(v6addr)))
+            } else {
+                // Try as a MAC address
+                Entity::Mac(
+                    addr.parse::<MacAddress>()
+                        .map_err(|err| Error::ParseMacAddr {
+                            dest: addr.into(),
+                            err,
+                        })?,
+                )
+            }
+        }
+        // Match bare numbers
+        num => Entity::Cidr(AnyIpCidr::new_host(IpAddr::V4(parse_ipv4dest(num)?))),
+    })
+}
+    
 fn parse_flags(flag_s: &str) -> HashSet<RoutingFlag> {
     flag_s.chars().map(RoutingFlag::from).collect()
 }
 
+fn parse_expire(s: &str) -> Result<Option<Duration>, Error> {
+    match s {
+        "!" => Ok(None),
+        n => Ok(Some(Duration::from_secs(n.parse().map_err(|err| {
+            Error::ParseExpiration {
+                expiration: s.into(),
+                err,
+            }
+        })?))),
+    }
+}
 
+fn parse_ipv4dest(dest: &str) -> Result<Ipv4Addr, Error> {
+    dest.parse::<Ipv4Addr>().or_else(|_| {
+        let parts: Vec<u8> = dest
+            .split('.')
+            .map(str::parse)
+            .collect::<std::result::Result<Vec<u8>, std::num::ParseIntError>>()
+            .map_err(|err| Error::ParseIPv4AddrBadInt {
+                addr: dest.into(),
+                err,
+            })?;
+        // This bizarre byte-ordering comes from inet_addr(3)
+        match parts.len() {
+            3 => Ok(Ipv4Addr::new(parts[0], parts[1], 0, parts[2])),
+            2 => Ok(Ipv4Addr::new(parts[0], 0, 0, parts[1])),
+            1 => Ok(Ipv4Addr::new(0, 0, 0, parts[0])),
+            len => Err(Error::ParseIPv4AddrNComps {
+                n_comps: len,
+                addr: dest.into(),
+            }),
+        }
+    })
+}
