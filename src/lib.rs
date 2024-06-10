@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 pub use routing_table::execute_netstat;
 
-// Exports
+// Crate Exports
 pub use route_entry::RouteEntry;
 pub use routing_flag::RoutingFlag;
 pub use routing_table::RoutingTable;

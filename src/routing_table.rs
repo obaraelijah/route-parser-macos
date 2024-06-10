@@ -12,6 +12,7 @@ pub struct RoutingTable {
     if_router: HashMap<String, Vec<IpAddr>>,
 }
 
+/// Various errors
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("failed to execute {NETSTAT_PATH}: {0}")]
@@ -51,7 +52,7 @@ impl RoutingTable {
         let mut headers = vec![];
         let mut routes = vec![];
         let mut proto = None;
-        let mut if_router = HashMap::new(); //  store default gateways for network interfaces
+        let mut if_router = HashMap::new();
 
         while let Some(line) = lines.next() {
             if line.is_empty() || line.starts_with("Routing table") {
@@ -139,7 +140,7 @@ pub async fn execute_netstat() -> Result<String, Error> {
 mod tests {
     use super::Error;
     use crate::{Destination, Entity, RoutingTable};
-    use std::process::ExitStatus;
+    use std::{process::ExitStatus, string::FromUtf8Error};
 
     include!(concat!(env!("OUT_DIR"), "/sample_table.rs"));
 
