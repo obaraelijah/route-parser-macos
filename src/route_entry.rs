@@ -134,6 +134,50 @@ impl RouteEntry {
             _ => false,
         }
     }
+
+    /// Compare two routes, returning the one that is more-precise based on whether
+    /// it resolves to an identified device or interface, or has a larger network
+    /// length
+    pub(crate) fn most_precise<'a>(&'a self, other: &'a Self) -> &'a Self {
+        match self.dest.entity {
+            // If this is a hardware address, we already know it's on the same
+            // local network, and it's in the ARP table & considered the most precise
+            Entity::Mac(_) => self,
+            Entity::Link(_) => match other.dest.entity {
+                // The other specifies a hardware address -- it's better
+                Entity::Mac(_) => other,
+                // Otherwise, just default to the LHS
+                _ => self,
+            },
+            Entity::Cidr(cidr) => match other.dest.entity {
+                Entity::Mac(_) | Entity::Link(_) => other,
+                Entity::Cidr(other_cidr) => {
+                    let Some(cidr_nl) = cidr.network_length() else {
+                        // Can't compare gateway CIDR of 'Any' type
+                        return other;
+                    };
+                    
+                    let Some(other_nl) = other_cidr.network_length() else {
+                        // Can't compare gateway CIDR of 'Any' type
+                        return self;
+                    };
+
+                    // Choose the one with the longest network length
+                    if cidr_nl >= other_nl {
+                        self
+                    } else {
+                        other
+                    }
+                }
+                Entity::Default => self,
+            },
+            Entity::Default => match other.dest.entity {
+                // Never prefer a default route
+                Entity::Default => self,
+                _ => other,
+            },
+        }
+    }
 }
 
 fn parse_destination(dest: &str) -> Result<Destination, Error> {
