@@ -1,7 +1,6 @@
+use crate::{Entity, Protocol, RouteEntry};
 use std::{collections::HashMap, net::IpAddr, process::ExitStatus, string::FromUtf8Error};
 use tokio::process::Command;
-
-use crate::RouteEntry;
 
 const NETSTAT_PATH: &str = "/usr/sbin/netstat";
 
@@ -28,6 +27,74 @@ pub enum Error {
 }
 
 impl RoutingTable {
+    /// Query the routing table using the `netstat` command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `netstat` command fails to execute, or returns
+    /// unparseable output.
+    pub async fn load_from_netstat() -> Result<Self, Error> {
+        let output = execute_netstat().await?;
+        Self::from_netstat_output(&output)
+    }
+
+
+    /// Generate a `RoutingTable` from complete netstat output.  The output should
+    /// conform to what would be returned from `netstat -rn` on macOS/Darwin.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error
+    pub fn from_netstat_output(output: &str) -> Result<RoutingTable, Error> {
+        let mut lines = output.lines();
+        let mut headers = vec![];
+        let mut routes = vec![];
+        let mut proto = None;
+        let mut if_router = HashMap::new(); //  store default gateways for network interfaces
+
+        while let Some(line) = lines.next() {
+            if line.is_empty() || line.starts_with("Routing table") {
+                continue;
+            }
+            match line {
+                section @ ("Internet:" | "Internet6:") => {
+                    proto = match section {
+                        "Internet:" => Some(Protocol::V4),
+                        "Internet6:" => Some(Protocol::V6),
+                        _ => unreachable!(),
+                    };
+                    // Next line will contain the column headers
+                    if let Some(line) = lines.next() {
+                        headers = line.split_ascii_whitespace().collect();
+                    } else {
+                        return Err(Error::NetstatParseNoHeaders(section.into()));
+                    }
+                    continue;
+                }
+                entry => {
+                    if let Some(proto) = proto {
+                        let route = RouteEntry::parse(proto, entry, &headers)?;
+                        if let (Entity::Default, Entity::Cidr(cidr)) =
+                            (&route.dest.entity, &route.gateway.entity)
+                        {
+                            if cidr.is_host_address() {
+                                let route = route.clone();
+                                let gws = if_router.entry(route.net_if).or_insert_with(Vec::new);
+                                // The route parser doesn't produce `Any` CIDRs,
+                                // so there's always a first address.
+                                gws.push(cidr.first_address().unwrap_or_else(|| unreachable!()));
+                            }
+                        }
+                        routes.push(route);
+                    } else {
+                        return Err(Error::EntryBeforeProto);
+                    }
+                }
+            };
+        }
+        Ok(RoutingTable { routes, if_router })
+    }
+
     /// Find the routing table entry that most-precisely matches the provided
     /// address.
     #[must_use]

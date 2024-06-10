@@ -1,13 +1,11 @@
+use crate::{Destination, Entity, Protocol, RoutingFlag};
+use cidr::AnyIpCidr;
+use mac_address::MacAddress;
 use std::{
     collections::HashSet,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     time::Duration,
 };
-
-use cidr::AnyIpCidr;
-use mac_address::MacAddress;
-
-use crate::{Destination, Entity, Protocol, RoutingFlag};
 
 /// A single route obtained from the `netstat -rn` output
 #[derive(Debug, Clone)]
@@ -96,6 +94,7 @@ impl RouteEntry {
         let mut net_if: Option<String> = None;
         let mut expires = None;
 
+        // Scan through the fields, matching them up with the headers.
         for (header, field) in headers.iter().zip(fields) {
             match *header {
                 "Destination" => dest = Some(parse_destination(&field)?),
@@ -141,7 +140,7 @@ impl RouteEntry {
     pub(crate) fn most_precise<'a>(&'a self, other: &'a Self) -> &'a Self {
         match self.dest.entity {
             // If this is a hardware address, we already know it's on the same
-            // local network, and it's in the ARP table & considered the most precise
+            // local network, and it's in the ARP table
             Entity::Mac(_) => self,
             Entity::Link(_) => match other.dest.entity {
                 // The other specifies a hardware address -- it's better
@@ -156,7 +155,7 @@ impl RouteEntry {
                         // Can't compare gateway CIDR of 'Any' type
                         return other;
                     };
-                    
+
                     let Some(other_nl) = other_cidr.network_length() else {
                         // Can't compare gateway CIDR of 'Any' type
                         return self;
@@ -217,6 +216,7 @@ fn parse_destination(dest: &str) -> Result<Destination, Error> {
         }
     })
 }
+
 fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
     Ok(match dest {
         "default" => Entity::Default,
@@ -227,7 +227,6 @@ fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
                 err,
             })?)
         }
-
         // IPv4 host
         addr if addr.contains('.') => {
             if let Ok(ipv4addr) = parse_ipv4dest(addr) {
@@ -244,7 +243,6 @@ fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
                 )
             }
         }
-
         // IPv6 host
         addr if addr.contains(':') => {
             if let Ok(v6addr) = addr.parse::<Ipv6Addr>() {
@@ -265,8 +263,8 @@ fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
     })
 }
 
-fn parse_flags(flag_s: &str) -> HashSet<RoutingFlag> {
-    flag_s.chars().map(RoutingFlag::from).collect()
+fn parse_flags(flags_s: &str) -> HashSet<RoutingFlag> {
+    flags_s.chars().map(RoutingFlag::from).collect()
 }
 
 fn parse_expire(s: &str) -> Result<Option<Duration>, Error> {
