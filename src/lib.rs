@@ -41,6 +41,7 @@ impl std::fmt::Display for Entity {
 
 
 /// A destination entity with an optional zone
+#[derive(Debug, Clone)]
 pub struct Destination {
     pub entity: Entity,
     pub zone: Option<String>,
@@ -58,6 +59,7 @@ impl std::fmt::Display for Destination {
 }
 
 /// Internet Protocols associated with routing table entries
+#[derive(Debug, Clone, Copy)]
 pub enum Protocol {
     V4,
     V6,
