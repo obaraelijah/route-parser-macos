@@ -25,7 +25,7 @@ pub struct RouteEntry {
     /// Network interface that holds this route
     pub net_if: String,
 
-    /// RouteEntry expiration.  This is primarily seen for ARP-derived entries
+    /// `RouteEntry` expiration.  This is primarily seen for ARP-derived entries
     pub expires: Option<Duration>,
 }
 

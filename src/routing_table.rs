@@ -38,7 +38,6 @@ impl RoutingTable {
         Self::from_netstat_output(&output)
     }
 
-
     /// Generate a `RoutingTable` from complete netstat output.  The output should
     /// conform to what would be returned from `netstat -rn` on macOS/Darwin.
     ///
