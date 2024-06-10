@@ -7,6 +7,7 @@ use std::fmt::Write;
 // Exports
 pub use route_entry::RouteEntry;
 pub use routing_flag::RoutingFlag;
+pub use routing_table::RoutingTable;
 
 use cidr::AnyIpCidr; //  either an IPv4 or an IPv6 network or "any".
 use mac_address::MacAddress;

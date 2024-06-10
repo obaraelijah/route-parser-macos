@@ -1,4 +1,5 @@
-use std::{collections::HashMap, net::IpAddr, process::{Command, ExitStatus}, string::FromUtf8Error};
+use std::{collections::HashMap, net::IpAddr, process::ExitStatus, string::FromUtf8Error};
+use tokio::process::Command;
 
 use crate::RouteEntry;
 
@@ -27,10 +28,22 @@ pub enum Error {
 }
 
 impl RoutingTable {
+    /// Find the routing table entry that most-precisely matches the provided
+    /// address.
     pub fn find_route_entry(&self, addr: IpAddr) -> Option<&RouteEntry> {
         // TODO: implement a proper lookup table and/or short-circuit on an
         // exact match
-        todo!()
+        self.routes
+            .iter()
+            .filter(|route| route.contains(addr))
+            .fold(None, |old, new| match old {
+                None => Some(new),
+                Some(old) => Some(old.most_precise(new)),
+            })
+    }
+
+    pub fn default_gateways_for_netif(&self, net_if: &str) -> Option<&Vec<IpAddr>> {
+        self.if_router.get(net_if)
     }
 }
 
@@ -39,6 +52,7 @@ pub async fn execute_netstat() -> Result<String, Error> {
         .arg("-rn")
         .stdin(std::process::Stdio::null())
         .output()
+        .await
         .map_err(Error::NetstatExec)?;
     if !output.status.success() {
         return Err(Error::NetstatFail(output.status));
