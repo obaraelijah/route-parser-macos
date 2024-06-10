@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Error, time::Duration};
 
-use crate::{routing_flag::RoutingFlag, Destination, Protocol};
+use crate::{Destination, Protocol, RoutingFlag};
 
 pub struct RouteEntry {
     pub proto: Protocol,
