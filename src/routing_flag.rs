@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, std::hash::Hash)]
 pub enum RoutingFlag {
     Proto1,    // 1

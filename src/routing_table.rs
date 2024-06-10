@@ -4,6 +4,4 @@ pub struct RoutingTable {
     routes: Vec<RouteEntry>,
 }
 
-impl RoutingTable {
-    
-}
+impl RoutingTable {}

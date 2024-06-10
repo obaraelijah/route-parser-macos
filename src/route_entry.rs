@@ -1,4 +1,8 @@
-use std::{collections::HashSet, net::{IpAddr, Ipv4Addr, Ipv6Addr}, time::Duration};
+use std::{
+    collections::HashSet,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
 
 use cidr::AnyIpCidr;
 use mac_address::MacAddress;
@@ -92,9 +96,12 @@ impl RouteEntry {
         let mut net_if: Option<String> = None;
         let mut expires = None;
 
-        for (header,  field) in headers.iter().zip(fields) {
+        for (header, field) in headers.iter().zip(fields) {
             match *header {
+                "Destination" => dest = Some(parse_destination(&field)?),
+                "Gateway" => gateway = Some(parse_destination(&field)?),
                 "Flags" => flags = parse_flags(&field),
+                "Netif" => net_if = Some(field),
                 "Expire" => expires = parse_expire(&field)?,
                 _ => (),
             }
@@ -107,11 +114,48 @@ impl RouteEntry {
             flags,
             net_if: net_if.ok_or(Error::MissingInterface)?,
             expires,
-       };
-       Ok(route)
+        };
+        Ok(route)
     }
 }
 
+fn parse_destination(dest: &str) -> Result<Destination, Error> {
+    if dest.starts_with("link") {
+        return Ok(Destination {
+            entity: Entity::Link(dest.to_owned()),
+            zone: None,
+        });
+    }
+    Ok(if let Some((addr, zone_etc)) = dest.split_once('%') {
+        // This route contains a zone ID
+        // See: https://superuser.com/questions/99746/why-is-there-a-percent-sign-in-the-ipv6-address
+        let addr: AnyIpCidr = addr.parse().map_err(|err| Error::ParseDestination {
+            value: addr.into(),
+            err,
+        })?;
+        let mut zone_etc = zone_etc.split('/');
+        let zone = zone_etc.next().map(ToOwned::to_owned);
+
+        if let Some(bits) = zone_etc.next() {
+            // Just reassemble it without the %zone and run it through the regular parser
+            let s = format!("{addr}{bits}");
+            Destination {
+                entity: parse_simple_destination(&s)?,
+                zone,
+            }
+        } else {
+            Destination {
+                entity: Entity::Cidr(addr),
+                zone,
+            }
+        }
+    } else {
+        Destination {
+            entity: parse_simple_destination(dest)?,
+            zone: None,
+        }
+    })
+}
 fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
     Ok(match dest {
         "default" => Entity::Default,
@@ -159,7 +203,7 @@ fn parse_simple_destination(dest: &str) -> Result<Entity, Error> {
         num => Entity::Cidr(AnyIpCidr::new_host(IpAddr::V4(parse_ipv4dest(num)?))),
     })
 }
-    
+
 fn parse_flags(flag_s: &str) -> HashSet<RoutingFlag> {
     flag_s.chars().map(RoutingFlag::from).collect()
 }

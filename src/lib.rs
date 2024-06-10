@@ -39,7 +39,6 @@ impl std::fmt::Display for Entity {
     }
 }
 
-
 /// A destination entity with an optional zone
 #[derive(Debug, Clone)]
 pub struct Destination {
