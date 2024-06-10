@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 cidr = { version = "0.2", features = ["serde"] }
+futures = "0.3"
 mac_address = "1"
 thiserror = "1"
 tokio = { version = "1", features = ["full"] }

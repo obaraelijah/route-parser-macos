@@ -117,6 +117,23 @@ impl RouteEntry {
         };
         Ok(route)
     }
+
+    /// Return whether the specified route's destination is appropriate for the given address
+    pub(crate) fn contains(&self, addr: IpAddr) -> bool {
+        match self.dest.entity {
+            Entity::Cidr(cidr) => cidr.contains(&addr),
+            Entity::Default => match self.gateway.entity {
+                Entity::Cidr(_) => match addr {
+                    IpAddr::V4(_) => matches!(self.proto, Protocol::V4),
+                    // FIXME: IPv6 should take zone into account
+                    IpAddr::V6(_) => matches!(self.proto, Protocol::V6),
+                },
+                // Ignore these -- they never "contain" any IpAddr
+                Entity::Link(_) | Entity::Mac(_) | Entity::Default => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 fn parse_destination(dest: &str) -> Result<Destination, Error> {
