@@ -11,6 +11,6 @@ pub struct Destination {
 }
 
 pub enum Protocol {
-    v4,
-    v6,
+    V4,
+    V6,
 }
